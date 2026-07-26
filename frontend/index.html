@@ -58,6 +58,8 @@ const Send = svgIcon(<><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22
 const Clock = svgIcon(<><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></>);
 const AlertTriangle = svgIcon(<><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></>);
 const LogOutIcon = svgIcon(<><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></>);
+const Trash2 = svgIcon(<><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></>);
+const KeyRound = svgIcon(<><path d="M15.5 7.5a4 4 0 1 1-5.66 5.66L2 21v-3l1-1h2v-2l1-1h2l2.34-2.34A4 4 0 0 1 15.5 7.5z"/><circle cx="16.5" cy="7.5" r="1.2"/></>);
 
 // =================================================================
 // Date + formatting helpers
@@ -231,6 +233,8 @@ tbody tr:hover { background: var(--surface-hover); }
 .btn.primary:hover { background:#d8ae57; }
 .btn.ghost { background:transparent; border-color:var(--border); color:var(--text-primary); }
 .btn.ghost:hover { background:var(--surface-hover); }
+.btn.danger { background:var(--danger); color:#fff; margin-bottom:8px; }
+.btn.danger:hover { background:#c9544e; }
 .btn:disabled { opacity:0.45; cursor:not-allowed; }
 .btn svg { width:15px;height:15px; }
 
@@ -367,6 +371,11 @@ function App() {
   const [extendDays, setExtendDays] = useState(5);
   const [extendError, setExtendError] = useState('');
   const [generatedLink, setGeneratedLink] = useState(null);
+  const [deleteModalUser, setDeleteModalUser] = useState(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [resetTokenModalUser, setResetTokenModalUser] = useState(null);
+  const [resetTokenResult, setResetTokenResult] = useState(null);
+  const [resetTokenBusy, setResetTokenBusy] = useState(false);
   const [logs, setLogs] = useState([]);
   const [toast, setToast] = useState(null);
   const [updateForm, setUpdateForm] = useState({ version: '', notes: '', force: false, target: 'all' });
@@ -436,6 +445,14 @@ function App() {
     return () => { cancelled = true; };
   }, [authToken]);
 
+  // Poll for fresh data every 20s so newly signed-up / logged-in users
+  // show up on their own instead of only after a manual refresh click.
+  useEffect(() => {
+    if (!authToken || booting || loadError) return;
+    const interval = setInterval(() => { refreshAll().catch(() => {}); }, 20000);
+    return () => clearInterval(interval);
+  }, [authToken, booting, loadError]);
+
   async function handleLogin(username, password) {
     const res = await fetch(`${API_BASE}/login.php`, {
       method: 'POST',
@@ -464,6 +481,53 @@ function App() {
       showToast(`${user.name} ${res.status === 'blocked' ? 'blocked' : 'unblocked'}`);
       refreshLogs();
     } catch (e) { showToast(e.message); }
+  }
+
+  function openDelete(user) {
+    setDeleteModalUser(user);
+  }
+
+  async function confirmDeleteUser() {
+    if (!deleteModalUser) return;
+    setDeleteBusy(true);
+    try {
+      await api('user_delete.php', { method: 'POST', body: JSON.stringify({ user_id: deleteModalUser.id }) });
+      setUsers(prev => prev.filter(u => u.id !== deleteModalUser.id));
+      showToast(`${deleteModalUser.name} deleted`);
+      setDeleteModalUser(null);
+      refreshLogs();
+    } catch (e) {
+      showToast(e.message);
+    } finally {
+      setDeleteBusy(false);
+    }
+  }
+
+  function openResetToken(user) {
+    setResetTokenModalUser(user);
+    setResetTokenResult(null);
+  }
+
+  async function confirmResetToken() {
+    if (!resetTokenModalUser) return;
+    setResetTokenBusy(true);
+    try {
+      const res = await api('user_reset_token.php', { method: 'POST', body: JSON.stringify({ user_id: resetTokenModalUser.id }) });
+      setResetTokenResult(res.token);
+      setUsers(prev => prev.map(u => u.id === resetTokenModalUser.id ? { ...u, token: res.token } : u));
+      showToast(`${resetTokenModalUser.name}'s token reset`);
+      refreshLogs();
+    } catch (e) {
+      showToast(e.message);
+    } finally {
+      setResetTokenBusy(false);
+    }
+  }
+
+  function copyResetToken() {
+    if (navigator.clipboard && resetTokenResult) {
+      navigator.clipboard.writeText(resetTokenResult).then(() => showToast('Token copied')).catch(() => showToast('Could not copy — select manually'));
+    }
   }
 
   async function revokeDevice(userId, device) {
@@ -703,6 +767,8 @@ function App() {
                                   <div className={`icon-btn${u.status !== 'blocked' ? ' danger' : ''}`} title={u.status === 'blocked' ? 'Unblock' : 'Block'} onClick={() => toggleBlock(u)}>
                                     {u.status === 'blocked' ? <CheckCircle2 /> : <Ban />}
                                   </div>
+                                  <div className="icon-btn brass" title="Reset token" onClick={() => openResetToken(u)}><KeyRound /></div>
+                                  <div className="icon-btn danger" title="Delete user" onClick={() => openDelete(u)}><Trash2 /></div>
                                 </div>
                               </td>
                             </tr>
@@ -878,6 +944,60 @@ function App() {
                       extended by {extendDays} days automatically — no further action needed here.
                     </p>
                     <button className="btn ghost" onClick={closeExtendAndRefresh}><RefreshCw />Close &amp; refresh status</button>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {deleteModalUser && (
+          <div className="modal-overlay" onClick={() => !deleteBusy && setDeleteModalUser(null)}>
+            <div className="modal" onClick={e => e.stopPropagation()}>
+              <div className="modal-header">
+                <div>
+                  <h3>Delete user</h3>
+                  <p>{deleteModalUser.name} · {deleteModalUser.email}</p>
+                </div>
+                <XIcon className="close-btn" onClick={() => !deleteBusy && setDeleteModalUser(null)} />
+              </div>
+              <div className="modal-body">
+                <div className="error-text"><AlertTriangle />This permanently removes the user, their token, and all their device history. This can't be undone.</div>
+                <button className="btn danger" disabled={deleteBusy} onClick={confirmDeleteUser}>
+                  <Trash2 />{deleteBusy ? 'Deleting…' : 'Delete permanently'}
+                </button>
+                <button className="btn ghost" disabled={deleteBusy} onClick={() => setDeleteModalUser(null)}>Cancel</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {resetTokenModalUser && (
+          <div className="modal-overlay" onClick={() => { if (!resetTokenBusy) { setResetTokenModalUser(null); setResetTokenResult(null); } }}>
+            <div className="modal" onClick={e => e.stopPropagation()}>
+              <div className="modal-header">
+                <div>
+                  <h3>Reset token</h3>
+                  <p>{resetTokenModalUser.name}</p>
+                </div>
+                <XIcon className="close-btn" onClick={() => { setResetTokenModalUser(null); setResetTokenResult(null); }} />
+              </div>
+              <div className="modal-body">
+                {!resetTokenResult && (
+                  <>
+                    <div className="error-text"><AlertTriangle />Their current token ({resetTokenModalUser.token}) will stop working immediately. Only share the new one with this user.</div>
+                    <button className="btn primary" disabled={resetTokenBusy} onClick={confirmResetToken}>
+                      <KeyRound />{resetTokenBusy ? 'Resetting…' : 'Reset token'}
+                    </button>
+                  </>
+                )}
+                {resetTokenResult && (
+                  <>
+                    <div className="link-box"><span>{resetTokenResult}</span><div className="icon-btn brass" onClick={copyResetToken}><Copy /></div></div>
+                    <p style={{ fontSize: 12, color: 'var(--text-secondary)', margin: 0 }}>
+                      Save this now — it won't be shown again. Send it to the user in place of their old token.
+                    </p>
+                    <button className="btn ghost" onClick={() => { setResetTokenModalUser(null); setResetTokenResult(null); }}>Close</button>
                   </>
                 )}
               </div>
