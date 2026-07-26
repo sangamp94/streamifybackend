@@ -55,6 +55,7 @@ if ($databaseUrl) {
 define('SHORTENER_URL', getenv('SHORTENER_URL') ?: 'https://example.com/your-shortener-link-here');
 define('SELF_EXTEND_DAYS', 7);          // days added per successful completion
 define('SELF_EXTEND_LINK_LIFETIME_MIN', 60); // minutes a pending request stays valid
+define('SELF_EXTEND_ELIGIBLE_WITHIN_DAYS', 5); // can only extend once 5 or fewer days remain (already-expired users can always extend)
 
 // ---------------------------------------------------------------
 // 1c. Self-service NEW token signup ("New user? Generate a token" on
@@ -246,6 +247,16 @@ function gen_user_id(PDO $pdo) {
         if (!$stmt->fetch()) return $id;
     }
     fail('Could not generate a unique user id — please try again.', 500);
+}
+
+/**
+ * Signed days between today and a Y-m-d date string: positive if the
+ * date is in the future, 0 if today, negative if already past.
+ */
+function days_until($dateStr) {
+    $today = new DateTime('today');
+    $target = DateTime::createFromFormat('Y-m-d', $dateStr);
+    return (int) floor(($target->getTimestamp() - $today->getTimestamp()) / 86400);
 }
 
 /**
