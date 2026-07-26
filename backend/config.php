@@ -99,6 +99,13 @@ try {
         [
             PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+            // Neon's pooled connection string routes through PgBouncer in
+            // transaction mode, which doesn't reliably support native
+            // server-side prepared statements (a statement prepared on one
+            // physical backend can vanish when the pool hands the next
+            // query to a different one). Emulating prepares client-side
+            // avoids that class of failure entirely.
+            PDO::ATTR_EMULATE_PREPARES => true,
         ]
     );
 } catch (PDOException $e) {
@@ -108,11 +115,16 @@ try {
 }
 
 // ---------------------------------------------------------------
-// 3b. Safety net — turns any other uncaught error (e.g. a missing table)
-//     into a readable message instead of a blank "500 Internal Server
-//     Error" with no explanation.
+// 3a. Belt-and-suspenders — if any statement inside a transaction throws
+//     and nothing downstream calls rollBack(), Postgres leaves the
+//     connection in "current transaction is aborted" state (SQLSTATE
+//     25P02), which then poisons the *next* query on that connection
+//     too. Roll back automatically before reporting the real error.
 // ---------------------------------------------------------------
-set_exception_handler(function ($e) {
+set_exception_handler(function ($e) use ($pdo) {
+    if (isset($pdo) && $pdo->inTransaction()) {
+        $pdo->rollBack();
+    }
     if (!headers_sent()) {
         http_response_code(500);
     }
