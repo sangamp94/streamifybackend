@@ -11,6 +11,35 @@ if ($token === '') fail('Please enter your token');
 
 $user = find_user_by_token($pdo, $token);
 
+// ---------------------------------------------------------------
+// Record this as a device/session so it shows up in the admin
+// console (Users -> Devices column, device modal, IP, "flagged"
+// count). Before this, nothing in the whole backend ever wrote to
+// the `devices` table outside the one-time seed data in
+// schema-postgres.sql — so no matter how many real people logged in
+// through the app, the admin dashboard kept showing zero activity.
+//
+// `platform` is optional — pass it from the app if you have a
+// friendly device string (e.g. "Android 14 • Pixel 8"); it falls
+// back to "Unknown device" if not sent. Same (user, ip, platform)
+// combo is treated as the same device across repeated logins (we
+// update last_seen) instead of creating a new row every time.
+// ---------------------------------------------------------------
+$platform = trim($in['platform'] ?? '') ?: 'Unknown device';
+$ip = client_ip();
+
+$stmt = $pdo->prepare('SELECT id FROM devices WHERE user_id = ? AND ip = ? AND platform = ?');
+$stmt->execute([$user['id'], $ip, $platform]);
+$existingDevice = $stmt->fetch();
+
+if ($existingDevice) {
+    $pdo->prepare('UPDATE devices SET last_seen = NOW() WHERE id = ?')->execute([$existingDevice['id']]);
+} else {
+    $deviceId = 'DEV-' . strtoupper(bin2hex(random_bytes(3)));
+    $pdo->prepare('INSERT INTO devices (id, user_id, platform, ip, last_seen) VALUES (?, ?, ?, ?, NOW())')
+        ->execute([$deviceId, $user['id'], $platform, $ip]);
+}
+
 respond([
     'ok' => true,
     'name' => $user['name'],
