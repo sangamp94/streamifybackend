@@ -14,6 +14,11 @@ if ($user['status'] === 'blocked') {
     fail('Your account is blocked. Contact support to resolve this before extending.', 403);
 }
 
+$daysLeft = days_until($user['expiry']);
+if ($daysLeft > SELF_EXTEND_ELIGIBLE_WITHIN_DAYS) {
+    fail("Your token is still valid for {$daysLeft} more day(s). Extension unlocks once " . SELF_EXTEND_ELIGIBLE_WITHIN_DAYS . " days or fewer remain.", 403);
+}
+
 // Reuse an existing pending (unredeemed, not yet expired) self-service
 // request for this user instead of piling up duplicate rows every time
 // they reopen the page or click twice.
