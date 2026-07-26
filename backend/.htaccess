@@ -1,0 +1,16 @@
+# Block direct browser access to the schema file — it should only ever
+# be uploaded through phpMyAdmin, never fetched over HTTP.
+<FilesMatch "\.sql$">
+  Require all denied
+</FilesMatch>
+
+# Shared PHP hosting (InfinityFree included) often strips the
+# "Authorization" header before PHP ever sees it. This app's login uses
+# "Authorization: Bearer <token>", so without this rule every request after
+# login fails with 401 "Not authenticated" even with a correct token.
+# This forwards it into $_SERVER['HTTP_AUTHORIZATION'] so PHP can read it.
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteCond %{HTTP:Authorization} ^(.*)
+  RewriteRule .* - [E=HTTP_AUTHORIZATION:%1]
+</IfModule>

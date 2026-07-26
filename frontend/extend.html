@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Extend My Access</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: system-ui, sans-serif; background:#10141C; color:#ECEFF4; display:flex; align-items:center; justify-content:center; min-height:100vh; padding:20px; }
+  .box { background:#171D28; border:1px solid #2A3240; border-radius:12px; padding:28px; width:100%; max-width:400px; }
+  h1 { font-size:19px; margin:0 0 6px; }
+  p.sub { font-size:13px; color:#9AA5B8; margin:0 0 20px; line-height:1.5; }
+  label { font-size:12px; color:#9AA5B8; display:block; margin-bottom:6px; }
+  input { width:100%; background:#1B2230; border:1px solid #2A3240; color:#ECEFF4; padding:11px 12px; border-radius:8px; margin-bottom:14px; font-size:14px; }
+  button { width:100%; background:#C9A24B; color:#14100a; border:none; padding:11px; border-radius:8px; font-weight:600; cursor:pointer; font-size:14px; }
+  button:disabled { opacity:0.6; cursor:default; }
+  button.secondary { background:transparent; color:#9AA5B8; border:1px solid #2A3240; margin-top:10px; }
+  .msg { font-size:12.5px; margin-bottom:14px; line-height:1.5; }
+  .msg.err { color:#E0625B; }
+  .msg.warn { color:#E0A15B; }
+  .card { background:#1B2230; border:1px solid #2A3240; border-radius:10px; padding:16px; margin-bottom:16px; }
+  .card .name { font-size:15px; font-weight:600; margin-bottom:4px; }
+  .card .expiry { font-size:13px; color:#9AA5B8; }
+  .card .expiry strong { color:#ECEFF4; }
+  .badge { display:inline-block; font-size:11px; padding:2px 8px; border-radius:999px; margin-left:8px; vertical-align:middle; }
+  .badge.blocked { background:rgba(224,98,91,0.15); color:#E0625B; }
+  .badge.active { background:rgba(79,168,160,0.15); color:#4FA8A0; }
+  .note { font-size:12px; color:#5B6472; margin-top:14px; line-height:1.5; }
+  .link { color:#C9A24B; cursor:pointer; text-decoration:underline; font-size:12.5px; }
+  .linkRow { text-align:center; margin-top:14px; }
+</style>
+</head>
+<body>
+<div class="box" id="app">
+  <h1>Extend My Access</h1>
+  <p class="sub">Log in with your app token to check your status and extend it.</p>
+  <div id="content"></div>
+</div>
+
+<script>
+// =================================================================
+// CONFIG — if backend/ sits next to this frontend/ folder (the
+// default layout), leave this as-is.
+// =================================================================
+const API_BASE = '../backend';
+const STORAGE_KEY = 'appguard_extend_token';
+const DEVICE_KEY = 'appguard_device_id';
+const SIGNUP_KEY = 'appguard_signup_sig';
+
+const content = document.getElementById('content');
+
+// A random id generated once per browser and kept in localStorage, so
+// the backend can recognize "this same device already got a token"
+// even though there's no native app reporting a real hardware id.
+function getDeviceId() {
+  let id = localStorage.getItem(DEVICE_KEY);
+  if (!id) {
+    id = (crypto.randomUUID ? crypto.randomUUID() : 'dev-' + Date.now() + '-' + Math.random().toString(36).slice(2));
+    localStorage.setItem(DEVICE_KEY, id);
+  }
+  return id;
+}
+
+function renderLogin(message) {
+  content.innerHTML = `
+    ${message ? `<div class="msg err">${message}</div>` : ''}
+    <label>Your app token</label>
+    <input type="text" id="tokenInput" placeholder="TKN-XXXX-XXXX-XXXX" autocomplete="off" autocapitalize="off" spellcheck="false">
+    <button id="loginBtn">Check my status</button>
+    <div class="linkRow"><span class="link" id="newUserLink">New user? Generate a token</span></div>
+  `;
+  document.getElementById('loginBtn').onclick = doLogin;
+  document.getElementById('tokenInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter') doLogin();
+  });
+  document.getElementById('newUserLink').onclick = () => renderSignup();
+}
+
+function renderSignup(message) {
+  content.innerHTML = `
+    ${message ? `<div class="msg err">${message}</div>` : ''}
+    <label>Your name</label>
+    <input type="text" id="signupName" placeholder="Full name" autocomplete="off">
+    <label>Your email</label>
+    <input type="email" id="signupEmail" placeholder="you@example.com" autocomplete="off">
+    <button id="generateBtn">Generate My Token</button>
+    <div class="note">Clicking this takes you through a short link, same as extending. Come back to this same browser afterward — your new token shows up automatically. Only one token is issued per device.</div>
+    <div class="linkRow"><span class="link" id="backToLoginLink">Already have a token? Log in</span></div>
+  `;
+  document.getElementById('generateBtn').onclick = doGenerateToken;
+  document.getElementById('backToLoginLink').onclick = () => renderLogin();
+}
+
+function renderStatus(user, token) {
+  const blockedBadge = user.blocked ? '<span class="badge blocked">Blocked</span>' : '<span class="badge active">Active</span>';
+  content.innerHTML = `
+    <div class="card">
+      <div class="name">${escapeHtml(user.name)} ${blockedBadge}</div>
+      <div class="expiry">Valid until <strong>${escapeHtml(user.expiry)}</strong></div>
+    </div>
+    ${user.blocked
+      ? '<div class="msg warn">Your account is blocked, so it can\'t be extended right now. Contact support.</div>'
+      : `<button id="extendBtn">Get +7 Day Extension</button>`
+    }
+    <button class="secondary" id="logoutBtn">Use a different token</button>
+    <div class="note">Clicking extend will take you through a short link. Come back to this same browser after completing it — your extension applies automatically.</div>
+  `;
+  if (!user.blocked) {
+    document.getElementById('extendBtn').onclick = () => doRequestExtend(token);
+  }
+  document.getElementById('logoutBtn').onclick = () => renderLogin();
+}
+
+function escapeHtml(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+async function doLogin() {
+  const token = document.getElementById('tokenInput').value.trim();
+  if (!token) return;
+  const btn = document.getElementById('loginBtn');
+  btn.disabled = true;
+  btn.textContent = 'Checking…';
+  try {
+    const res = await fetch(`${API_BASE}/user_login.php`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token })
+    });
+    const data = await res.json();
+    if (!res.ok || data.error) {
+      renderLogin(data.error || 'Something went wrong. Try again.');
+      return;
+    }
+    renderStatus(data, token);
+  } catch (e) {
+    renderLogin('Network error — check your connection and try again.');
+  }
+}
+
+async function doRequestExtend(token) {
+  const btn = document.getElementById('extendBtn');
+  btn.disabled = true;
+  btn.textContent = 'One sec…';
+  try {
+    const res = await fetch(`${API_BASE}/user_request_extend.php`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token })
+    });
+    const data = await res.json();
+    if (!res.ok || data.error) {
+      btn.disabled = false;
+      btn.textContent = 'Get +7 Day Extension';
+      alert(data.error || 'Something went wrong. Try again.');
+      return;
+    }
+    // Remember who's completing the shortener so extend_gateway.php
+    // knows whose extension to apply when they land back.
+    localStorage.setItem(STORAGE_KEY, token);
+    window.location.href = data.redirect;
+  } catch (e) {
+    btn.disabled = false;
+    btn.textContent = 'Get +7 Day Extension';
+    alert('Network error — check your connection and try again.');
+  }
+}
+
+async function doGenerateToken() {
+  const name = document.getElementById('signupName').value.trim();
+  const email = document.getElementById('signupEmail').value.trim();
+  if (!name || !email) {
+    renderSignup('Please fill in both your name and email.');
+    return;
+  }
+  const btn = document.getElementById('generateBtn');
+  btn.disabled = true;
+  btn.textContent = 'One sec…';
+  try {
+    const res = await fetch(`${API_BASE}/user_generate_token.php`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ device_id: getDeviceId(), name, email })
+    });
+    const data = await res.json();
+    if (!res.ok || data.error) {
+      renderSignup(data.error || 'Something went wrong. Try again.');
+      return;
+    }
+    // Remember which pending signup this browser is completing, so
+    // extend_gateway.php knows to finalize a NEW token when it lands back.
+    localStorage.setItem(SIGNUP_KEY, data.sig);
+    window.location.href = data.redirect;
+  } catch (e) {
+    btn.disabled = false;
+    btn.textContent = 'Generate My Token';
+    alert('Network error — check your connection and try again.');
+  }
+}
+
+renderLogin();
+</script>
+</body>
+</html>
