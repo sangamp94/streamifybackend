@@ -12,6 +12,11 @@ if ($token === '') fail('Missing token');
 
 $user = find_user_by_token($pdo, $token);
 
+$daysLeft = days_until($user['expiry']);
+if ($daysLeft > SELF_EXTEND_ELIGIBLE_WITHIN_DAYS) {
+    fail("Your token is still valid for {$daysLeft} more day(s). Extension unlocks once " . SELF_EXTEND_ELIGIBLE_WITHIN_DAYS . " days or fewer remain.", 403);
+}
+
 $stmt = $pdo->prepare(
     'SELECT * FROM extend_links
      WHERE user_id = ? AND redeemed = 0 AND expires_at > NOW()
