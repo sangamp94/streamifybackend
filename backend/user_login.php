@@ -46,4 +46,9 @@ respond([
     'status' => $user['status'],
     'expiry' => $user['expiry'],
     'blocked' => $user['status'] === 'blocked',
+    // Previously nothing checked this at login time — a token past its
+    // expiry date would still come back as a normal successful login.
+    // The app should treat expired:true the same as blocked and refuse
+    // to open, prompting the user to renew instead.
+    'expired' => days_until($user['expiry']) < 0,
 ]);
