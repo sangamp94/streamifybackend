@@ -79,12 +79,39 @@ function addDaysToDate(dateStr, days) {
   base.setDate(base.getDate() + days);
   return base.toISOString().slice(0, 10);
 }
+// The backend (Postgres, via config.php) always stores and sends
+// timestamps as naive UTC strings like "2026-07-24 21:10:00" — no "Z",
+// no offset. Left alone, `new Date(...)` on a string like that is parsed
+// as LOCAL time by the browser, not UTC, so anyone not physically in the
+// UTC zone would see the wrong clock reading. toUtcDate() forces correct
+// UTC parsing, and both formatters below explicitly pin the OUTPUT to
+// Asia/Kolkata — so "last seen" / activity times always read as true
+// Indian Standard Time, regardless of the admin's own device timezone.
+function toUtcDate(value) {
+  if (!value) return null;
+  if (value instanceof Date) return value;
+  let s = String(value).trim().replace(' ', 'T');
+  if (!/Z$|[+-]\d{2}:?\d{2}$/.test(s)) s += 'Z'; // mark as UTC if no zone info present
+  const d = new Date(s);
+  return isNaN(d) ? null : d;
+}
 function fmtDT(value) {
-  return String(value).slice(0, 16);
+  const d = toUtcDate(value);
+  if (!d) return '—';
+  return d.toLocaleString('en-IN', {
+    timeZone: 'Asia/Kolkata',
+    day: '2-digit', month: 'short', year: 'numeric',
+    hour: '2-digit', minute: '2-digit', hour12: true,
+  }) + ' IST';
 }
 function fmtLogTime(value) {
-  const d = value instanceof Date ? value : new Date(String(value).replace(' ', 'T'));
-  return d.toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+  const d = toUtcDate(value);
+  if (!d) return '—';
+  return d.toLocaleString('en-IN', {
+    timeZone: 'Asia/Kolkata',
+    day: '2-digit', month: 'short',
+    hour: '2-digit', minute: '2-digit', hour12: true,
+  }) + ' IST';
 }
 
 const navItems = [
