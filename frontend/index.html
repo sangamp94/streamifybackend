@@ -60,6 +60,7 @@ const AlertTriangle = svgIcon(<><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16
 const LogOutIcon = svgIcon(<><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></>);
 const Trash2 = svgIcon(<><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></>);
 const KeyRound = svgIcon(<><path d="M15.5 7.5a4 4 0 1 1-5.66 5.66L2 21v-3l1-1h2v-2l1-1h2l2.34-2.34A4 4 0 0 1 15.5 7.5z"/><circle cx="16.5" cy="7.5" r="1.2"/></>);
+const MenuIcon = svgIcon(<><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></>);
 
 // =================================================================
 // Date + formatting helpers
@@ -778,16 +779,16 @@ function App() {
                           const dLeft = daysUntil(u.expiry);
                           return (
                             <tr key={u.id}>
-                              <td className="user-cell"><div className="name">{u.name}</div><div className="email">{u.email}</div></td>
-                              <td><span className="token-pill">{u.token}</span></td>
-                              <td><DeviceDots count={u.devices.length} /></td>
-                              <td>
+                              <td className="user-cell" data-label="User"><div className="name">{u.name}</div><div className="email">{u.email}</div></td>
+                              <td data-label="Token"><span className="token-pill">{u.token}</span></td>
+                              <td data-label="Devices"><DeviceDots count={u.devices.length} /></td>
+                              <td data-label="IP Address">
                                 <span className="ip-mono">{uniqueIps[0]}</span>
                                 {uniqueIps.length > 1 && <span style={{ color: 'var(--text-muted)', fontSize: 11.5, marginLeft: 5 }}>+{uniqueIps.length - 1} more</span>}
                               </td>
-                              <td style={{ color: dLeft < 0 ? 'var(--text-muted)' : dLeft <= 3 ? 'var(--amber)' : 'var(--text-secondary)' }}>{fmtDate(u.expiry)}</td>
-                              <td><StatusBadge user={u} /></td>
-                              <td>
+                              <td data-label="Expiry" style={{ color: dLeft < 0 ? 'var(--text-muted)' : dLeft <= 3 ? 'var(--amber)' : 'var(--text-secondary)' }}>{fmtDate(u.expiry)}</td>
+                              <td data-label="Status"><StatusBadge user={u} /></td>
+                              <td data-label="Actions">
                                 <div className="row-actions">
                                   <div className="icon-btn brass" title="View devices" onClick={() => setDeviceModalUser(u)}><Smartphone /></div>
                                   <div className="icon-btn brass" title="Extend token" onClick={() => openExtend(u)}><Link2 /></div>
@@ -823,12 +824,12 @@ function App() {
                       <tbody>
                         {allDevices.map(d => (
                           <tr key={d.id}>
-                            <td>{d.userName}</td>
-                            <td><span className="token-pill">{d.id}</span></td>
-                            <td>{d.platform}</td>
-                            <td><span className="ip-mono">{d.ip}</span></td>
-                            <td style={{ color: 'var(--text-secondary)' }}>{fmtDT(d.lastSeen)}</td>
-                            <td><div className="icon-btn danger" title="Revoke device" onClick={() => revokeDevice(d.userId, d)}><XIcon /></div></td>
+                            <td data-label="User">{d.userName}</td>
+                            <td data-label="Device ID"><span className="token-pill">{d.id}</span></td>
+                            <td data-label="Platform">{d.platform}</td>
+                            <td data-label="IP Address"><span className="ip-mono">{d.ip}</span></td>
+                            <td data-label="Last Seen" style={{ color: 'var(--text-secondary)' }}>{fmtDT(d.lastSeen)}</td>
+                            <td data-label="Action"><div className="icon-btn danger" title="Revoke device" onClick={() => revokeDevice(d.userId, d)}><XIcon /></div></td>
                           </tr>
                         ))}
                         {allDevices.length === 0 && <tr><td colSpan={6}><div className="empty">No devices match this search.</div></td></tr>}
