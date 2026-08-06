@@ -11,8 +11,8 @@
   h1 { font-size:19px; margin:0 0 6px; }
   p.sub { font-size:13px; color:#9AA5B8; margin:0 0 20px; line-height:1.5; }
   label { font-size:12px; color:#9AA5B8; display:block; margin-bottom:6px; }
-  input { width:100%; background:#1B2230; border:1px solid #2A3240; color:#ECEFF4; padding:11px 12px; border-radius:8px; margin-bottom:14px; font-size:14px; }
-  button { width:100%; background:#C9A24B; color:#14100a; border:none; padding:11px; border-radius:8px; font-weight:600; cursor:pointer; font-size:14px; }
+  input { width:100%; background:#1B2230; border:1px solid #2A3240; color:#ECEFF4; padding:12px; border-radius:8px; margin-bottom:14px; font-size:16px; }
+  button { width:100%; background:#C9A24B; color:#14100a; border:none; padding:13px; border-radius:8px; font-weight:600; cursor:pointer; font-size:15px; }
   button:disabled { opacity:0.6; cursor:default; }
   button.secondary { background:transparent; color:#9AA5B8; border:1px solid #2A3240; margin-top:10px; }
   .msg { font-size:12.5px; margin-bottom:14px; line-height:1.5; }
@@ -26,8 +26,12 @@
   .badge.blocked { background:rgba(224,98,91,0.15); color:#E0625B; }
   .badge.active { background:rgba(79,168,160,0.15); color:#4FA8A0; }
   .note { font-size:12px; color:#5B6472; margin-top:14px; line-height:1.5; }
-  .link { color:#C9A24B; cursor:pointer; text-decoration:underline; font-size:12.5px; }
+  .link { color:#C9A24B; cursor:pointer; text-decoration:underline; font-size:12.5px; padding:4px 0; display:inline-block; }
   .linkRow { text-align:center; margin-top:14px; }
+  @media (max-width: 380px) {
+    body { padding:12px; }
+    .box { padding:20px; }
+  }
 </style>
 </head>
 <body>

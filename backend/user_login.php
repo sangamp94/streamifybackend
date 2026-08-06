@@ -28,17 +28,7 @@ $user = find_user_by_token($pdo, $token);
 $platform = trim($in['platform'] ?? '') ?: 'Unknown device';
 $ip = client_ip();
 
-$stmt = $pdo->prepare('SELECT id FROM devices WHERE user_id = ? AND ip = ? AND platform = ?');
-$stmt->execute([$user['id'], $ip, $platform]);
-$existingDevice = $stmt->fetch();
-
-if ($existingDevice) {
-    $pdo->prepare('UPDATE devices SET last_seen = NOW() WHERE id = ?')->execute([$existingDevice['id']]);
-} else {
-    $deviceId = 'DEV-' . strtoupper(bin2hex(random_bytes(3)));
-    $pdo->prepare('INSERT INTO devices (id, user_id, platform, ip, last_seen) VALUES (?, ?, ?, ?, NOW())')
-        ->execute([$deviceId, $user['id'], $platform, $ip]);
-}
+touch_device($pdo, $user['id'], $ip, $platform);
 
 respond([
     'ok' => true,

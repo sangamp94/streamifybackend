@@ -75,6 +75,14 @@ define('SIGNUP_TOKEN_DAYS', 7);          // validity of a freshly self-generated
 define('SIGNUP_LINK_LIFETIME_MIN', 60);  // minutes a pending signup stays valid
 
 // ---------------------------------------------------------------
+// 1d. Online status. A device counts as "online" if it has checked in
+//     (via user_login.php or user_verify.php) within this many minutes.
+//     Keep this small-ish since it's meant to reflect "active right
+//     now", not "used the app today".
+// ---------------------------------------------------------------
+define('ONLINE_THRESHOLD_MINUTES', 3);
+
+// ---------------------------------------------------------------
 // 2. CORS — restrict this to your actual frontend URL once you know it.
 //    If frontend and backend are on the same InfinityFree site, CORS
 //    doesn't matter, but leaving this open doesn't hurt either.
@@ -257,6 +265,34 @@ function days_until($dateStr) {
     $today = new DateTime('today');
     $target = DateTime::createFromFormat('Y-m-d', $dateStr);
     return (int) floor(($target->getTimestamp() - $today->getTimestamp()) / 86400);
+}
+
+/**
+ * Records/updates a device "check-in" for an app user — same (user, ip,
+ * platform) combo is treated as one device across repeated calls (we
+ * just bump last_seen) instead of creating a new row every time.
+ *
+ * This is what powers the Online/Offline indicator in the admin
+ * console: a device (and therefore the user) counts as "online" while
+ * its last_seen is within ONLINE_THRESHOLD_MINUTES. Called from both
+ * user_login.php (on app open) and user_verify.php (on every periodic
+ * check the app makes while it stays open) — the more often the real
+ * app calls user_verify.php, the more accurate "online" is.
+ */
+function touch_device(PDO $pdo, $userId, $ip, $platform) {
+    $stmt = $pdo->prepare('SELECT id FROM devices WHERE user_id = ? AND ip = ? AND platform = ?');
+    $stmt->execute([$userId, $ip, $platform]);
+    $existing = $stmt->fetch();
+
+    if ($existing) {
+        $pdo->prepare('UPDATE devices SET last_seen = NOW() WHERE id = ?')->execute([$existing['id']]);
+        return $existing['id'];
+    }
+
+    $deviceId = 'DEV-' . strtoupper(bin2hex(random_bytes(3)));
+    $pdo->prepare('INSERT INTO devices (id, user_id, platform, ip, last_seen) VALUES (?, ?, ?, ?, NOW())')
+        ->execute([$deviceId, $userId, $platform, $ip]);
+    return $deviceId;
 }
 
 /**

@@ -135,6 +135,10 @@ function StatusBadge({ user }) {
   return <span className="badge active"><CheckCircle2 />Active</span>;
 }
 
+function OnlineDot({ online }) {
+  return <span className={`online-dot${online ? '' : ' off'}`} title={online ? 'Online now' : 'Offline'} />;
+}
+
 function DeviceDots({ count }) {
   const shown = Math.min(count, 6);
   const dots = [];
@@ -203,7 +207,7 @@ const css = `
 
 .content { padding:24px 28px; overflow-y:auto; flex:1; }
 
-.stat-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:22px; }
+.stat-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:14px; margin-bottom:22px; }
 .stat-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:16px 18px; }
 .stat-card .label { font-size:12px; color:var(--text-secondary); display:flex; align-items:center; gap:6px; }
 .stat-card .value { font-family:'Space Grotesk'; font-size:28px; font-weight:600; margin-top:8px; }
@@ -248,6 +252,12 @@ tbody tr:hover { background: var(--surface-hover); }
 .dot.over { background:var(--amber); }
 .device-count-text { font-size:12px; color:var(--text-secondary); margin-left:6px; }
 .device-count-text.flag { color:var(--amber); font-weight:600; }
+
+.online-dot { display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--teal); box-shadow:0 0 0 3px rgba(79,168,160,0.18); margin-right:7px; vertical-align:middle; flex-shrink:0; }
+.online-dot.off { background:var(--text-muted); box-shadow:none; }
+
+.hamburger-btn { display:none; }
+.sidebar-overlay { display:none; }
 
 .row-actions { display:flex; gap:6px; }
 .icon-btn { width:30px;height:30px; display:flex;align-items:center;justify-content:center; border-radius:7px; border:1px solid var(--border); background:var(--bg-elevated); color:var(--text-secondary); cursor:pointer; }
@@ -320,12 +330,68 @@ tbody tr:hover { background: var(--surface-hover); }
 .config-error-screen h3 { font-family:'Space Grotesk'; color:var(--danger); margin:0 0 8px; font-size:16px; }
 .config-error-screen code { font-family:'IBM Plex Mono'; background:var(--bg-elevated); padding:1px 6px; border-radius:4px; font-size:12px; }
 
-@media (max-width: 900px) {
+/* Tablet: collapse the sidebar to an icon-only rail. */
+@media (max-width: 900px) and (min-width: 641px) {
   .sidebar { width:64px; }
   .sidebar .brand-name, .sidebar .brand-sub, .nav-item span, .sidebar-footer, .sidebar-user .who { display:none; }
   .nav-item { justify-content:center; }
+}
+@media (max-width: 900px) {
   .stat-grid { grid-template-columns:repeat(2,1fr); }
   .two-col { grid-template-columns:1fr; }
+}
+
+/* Phone: sidebar becomes a full off-canvas drawer opened via the
+   hamburger button, tables switch from a horizontal-scroll grid to
+   stacked label/value cards (using the data-label attributes already
+   present on every <td>), and form inputs are bumped to 16px so iOS
+   Safari doesn't zoom in on focus. */
+@media (max-width: 640px) {
+  .hamburger-btn { display:flex; }
+
+  .sidebar {
+    position:fixed; top:0; left:0; height:100vh; width:236px;
+    transform:translateX(-100%); transition:transform .2s ease;
+    z-index:60; box-shadow:0 0 40px rgba(0,0,0,0.5);
+  }
+  .sidebar.open { transform:translateX(0); }
+  .sidebar .brand-name, .sidebar .brand-sub, .nav-item span,
+  .sidebar-footer, .sidebar-user .who { display:block; }
+  .nav-item { justify-content:flex-start; }
+
+  .sidebar-overlay { display:block; position:fixed; inset:0; background:rgba(8,10,14,0.6); z-index:55; }
+
+  .topbar { padding:14px 16px; }
+  .topbar h1 { font-size:17px; }
+  .content { padding:14px; }
+
+  .stat-grid { grid-template-columns:repeat(2,1fr); gap:10px; }
+  .stat-card { padding:13px 14px; }
+  .stat-card .value { font-size:22px; }
+
+  .modal-overlay { padding:12px; }
+
+  .field input, .field select, .field textarea, .search-box input { font-size:16px; }
+
+  /* Stacked card-style tables instead of a wide grid. */
+  .table-wrap table, .table-wrap tbody, .table-wrap tr { display:block; width:100%; }
+  .table-wrap thead { display:none; }
+  .table-wrap tbody tr {
+    border-bottom:1px solid var(--border); padding:8px 0; margin-bottom:2px;
+  }
+  .table-wrap tbody td {
+    display:flex; align-items:center; justify-content:space-between; gap:14px;
+    padding:7px 16px; border-bottom:none; white-space:normal; text-align:right;
+  }
+  .table-wrap tbody td[data-label]::before {
+    content: attr(data-label); font-size:10.5px; text-transform:uppercase; letter-spacing:.04em;
+    color:var(--text-muted); font-weight:600; text-align:left; flex-shrink:0;
+  }
+  .table-wrap .row-actions { justify-content:flex-end; flex-wrap:wrap; }
+}
+
+@media (max-width: 380px) {
+  .stat-grid { grid-template-columns:1fr; }
 }
 `;
 
@@ -391,6 +457,7 @@ function App() {
   const [loadError, setLoadError] = useState('');
 
   const [tab, setTab] = useState('dashboard');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [users, setUsers] = useState([]);
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -631,6 +698,7 @@ function App() {
     active: users.filter(u => u.status === 'active').length,
     blocked: users.filter(u => u.status === 'blocked').length,
     flagged: users.filter(u => u.devices.length > MAX_DEVICES).length,
+    online: users.filter(u => u.online).length,
   }), [users]);
 
   const flaggedUsers = users.filter(u => u.devices.length > MAX_DEVICES);
@@ -657,7 +725,8 @@ function App() {
   } else {
     body = (
       <>
-        <aside className="sidebar">
+        {sidebarOpen && <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)} />}
+        <aside className={`sidebar${sidebarOpen ? ' open' : ''}`}>
           <div className="brand">
             <div className="brand-mark">AP</div>
             <div>
@@ -669,7 +738,7 @@ function App() {
             {navItems.map(item => {
               const Icon = item.icon;
               return (
-                <div key={item.id} className={`nav-item${tab === item.id ? ' active' : ''}`} onClick={() => setTab(item.id)}>
+                <div key={item.id} className={`nav-item${tab === item.id ? ' active' : ''}`} onClick={() => { setTab(item.id); setSidebarOpen(false); }}>
                   <Icon />
                   <span>{item.label}</span>
                 </div>
@@ -687,7 +756,9 @@ function App() {
 
         <div className="main">
           <div className="topbar">
-            <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div className="icon-btn brass hamburger-btn" title="Menu" onClick={() => setSidebarOpen(true)}><MenuIcon /></div>
+              <div>
               <h1>
                 {tab === 'dashboard' && 'Dashboard'}
                 {tab === 'users' && 'Users & Tokens'}
@@ -702,6 +773,7 @@ function App() {
                 {tab === 'update' && 'Push app updates and force-update rules'}
                 {tab === 'logs' && 'Every admin action, most recent first'}
               </p>
+              </div>
             </div>
             <div className="topbar-right">
               <div className="icon-btn brass" title="Refresh data" onClick={() => refreshAll().catch(e => showToast(e.message))}><RefreshCw /></div>
@@ -714,6 +786,7 @@ function App() {
               <>
                 <div className="stat-grid">
                   <div className="stat-card brass"><div className="label"><UsersIcon />Total Users</div><div className="value">{stats.total}</div></div>
+                  <div className="stat-card teal"><div className="label"><span className="online-dot" style={{ marginRight: 6 }} />Online Now</div><div className="value">{stats.online}</div></div>
                   <div className="stat-card teal"><div className="label"><CheckCircle2 />Active Tokens</div><div className="value">{stats.active}</div></div>
                   <div className="stat-card danger"><div className="label"><Ban />Blocked</div><div className="value">{stats.blocked}</div></div>
                   <div className="stat-card amber"><div className="label"><ShieldAlert />Multi-Device Flags</div><div className="value">{stats.flagged}</div></div>
@@ -779,7 +852,7 @@ function App() {
                           const dLeft = daysUntil(u.expiry);
                           return (
                             <tr key={u.id}>
-                              <td className="user-cell" data-label="User"><div className="name">{u.name}</div><div className="email">{u.email}</div></td>
+                              <td className="user-cell" data-label="User"><div className="name"><OnlineDot online={u.online} />{u.name}</div><div className="email">{u.email}</div></td>
                               <td data-label="Token"><span className="token-pill">{u.token}</span></td>
                               <td data-label="Devices"><DeviceDots count={u.devices.length} /></td>
                               <td data-label="IP Address">
@@ -820,7 +893,7 @@ function App() {
                 <div className="panel">
                   <div className="table-wrap">
                     <table>
-                      <thead><tr><th>User</th><th>Device ID</th><th>Platform</th><th>IP Address</th><th>Last Seen</th><th>Action</th></tr></thead>
+                      <thead><tr><th>User</th><th>Device ID</th><th>Platform</th><th>IP Address</th><th>Last Seen</th><th>Status</th><th>Action</th></tr></thead>
                       <tbody>
                         {allDevices.map(d => (
                           <tr key={d.id}>
@@ -829,10 +902,11 @@ function App() {
                             <td data-label="Platform">{d.platform}</td>
                             <td data-label="IP Address"><span className="ip-mono">{d.ip}</span></td>
                             <td data-label="Last Seen" style={{ color: 'var(--text-secondary)' }}>{fmtDT(d.lastSeen)}</td>
+                            <td data-label="Status"><span className={`badge ${d.online ? 'active' : 'expired'}`}><OnlineDot online={d.online} />{d.online ? 'Online' : 'Offline'}</span></td>
                             <td data-label="Action"><div className="icon-btn danger" title="Revoke device" onClick={() => revokeDevice(d.userId, d)}><XIcon /></div></td>
                           </tr>
                         ))}
-                        {allDevices.length === 0 && <tr><td colSpan={6}><div className="empty">No devices match this search.</div></td></tr>}
+                        {allDevices.length === 0 && <tr><td colSpan={7}><div className="empty">No devices match this search.</div></td></tr>}
                       </tbody>
                     </table>
                   </div>
@@ -922,7 +996,7 @@ function App() {
                   {deviceModalUser.devices.map(d => (
                     <div key={d.id} className="device-row">
                       <div>
-                        <div className="d-id">{d.id} · {d.ip}</div>
+                        <div className="d-id"><OnlineDot online={d.online} />{d.id} · {d.ip}</div>
                         <div className="d-meta">{d.platform} · last seen {fmtDT(d.lastSeen)}</div>
                       </div>
                       <div className="icon-btn danger" title="Revoke this device" onClick={() => revokeDevice(deviceModalUser.id, d)}><XIcon /></div>
