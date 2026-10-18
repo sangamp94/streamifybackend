@@ -8,6 +8,8 @@
   },
   "rewrites": [
     { "source": "/backend/:endpoint", "destination": "/api/backend/router.php?endpoint=:endpoint" },
+    { "source": "/setup", "destination": "/frontend/setup.html" },
+    { "source": "/setup/", "destination": "/frontend/setup.html" },
     { "source": "/extend", "destination": "/frontend/extend.html" },
     { "source": "/extend/", "destination": "/frontend/extend.html" },
     { "source": "/", "destination": "/frontend/index.html" }
