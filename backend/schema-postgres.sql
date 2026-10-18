@@ -1,4 +1,4 @@
--- AppGuard Admin Console — PostgreSQL schema (for Render + Neon)
+-- AppGuard Admin Console — PostgreSQL schema (for Vercel + Neon)
 -- Run this ONCE in the Neon SQL Editor (or `psql "$DATABASE_URL" -f schema-postgres.sql`)
 -- after creating your Neon project. Run the WHOLE file in one go.
 
@@ -133,5 +133,6 @@ INSERT INTO logs (action, text, time) VALUES
 INSERT INTO update_history (version, notes, force_update, target, time) VALUES
 ('2.4.0','Fixed login crash on Android 12; improved token sync speed.',1,'all','2026-07-22 18:30:00');
 
--- NOTE: no admin_users row is created here on purpose — visit
--- backend/setup.php once after deploying, then remove it from the repo.
+-- NOTE: no admin_users row is created here on purpose. After deploying,
+-- set ADMIN_SETUP_SECRET in Vercel and visit /setup to create the first
+-- admin. Keep the guarded setup endpoint available for password recovery.
