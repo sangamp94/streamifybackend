@@ -2,9 +2,9 @@
 /**
  * config.php — shared bootstrap for every endpoint.
  *
- * Render + Neon (Postgres) version. Nothing in this file needs editing —
- * set DATABASE_URL as an environment variable on your Render service
- * (Render dashboard -> your service -> Environment) instead.
+ * Vercel + Neon (Postgres) version. Nothing in this file needs editing —
+ * set DATABASE_URL as an environment variable in your Vercel project
+ * (Vercel Dashboard -> Project Settings -> Environment Variables) instead.
  */
 
 // Standardize PHP's clock. Belt-and-suspenders: even though every
@@ -15,12 +15,12 @@ date_default_timezone_set('UTC');
 
 // ---------------------------------------------------------------
 // 1. Database credentials — read from environment variables, not
-//    hardcoded here. This is the Render + Neon (Postgres) version.
+//    hardcoded here. This is the Vercel + Neon (Postgres) version.
 //
-//    Set ONE of these as an env var on your Render service:
+//    Set ONE of these as an env var in your Vercel project:
 //      DATABASE_URL = postgres://user:pass@host/dbname?sslmode=require
 //      (this is exactly the connection string Neon gives you on its
-//      dashboard — copy it as-is into Render's environment tab)
+//      dashboard — copy it as-is into Vercel Environment Variables)
 //
 //    Never hardcode real credentials in this file again: env vars mean
 //    re-deploying or re-uploading this file can't ever wipe out your
@@ -119,7 +119,7 @@ try {
     );
 } catch (PDOException $e) {
     http_response_code(500);
-    echo json_encode(['error' => 'Database connection failed. Check the DATABASE_URL environment variable on Render.']);
+    echo json_encode(['error' => 'Database connection failed. Check the DATABASE_URL environment variable in Vercel Project Settings.']);
     exit;
 }
 
