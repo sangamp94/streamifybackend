@@ -4,6 +4,9 @@
   "functions": {
     "api/backend/*.php": {
       "runtime": "vercel-php@0.9.0"
+    },
+    "api/setup.php": {
+      "runtime": "vercel-php@0.9.0"
     }
   },
   "routes": [
@@ -11,8 +14,17 @@
       "src": "/backend/(login|logout|me|users_list|logs_list|update_history_list|user_block_toggle|user_delete|user_reset_token|device_revoke|user_generate_link|update_push|setup|user_login|user_request_extend|user_generate_token|extend_gateway|extend_finalize|user_verify)\\.php$",
       "dest": "/api/backend/$1.php"
     },
-    { "src": "/setup/?$", "dest": "/frontend/setup.html" },
-    { "src": "/extend/?$", "dest": "/frontend/extend.html" },
-    { "src": "/$", "dest": "/frontend/index.html" }
+    {
+      "src": "/setup/?$",
+      "dest": "/frontend/setup.html"
+    },
+    {
+      "src": "/extend/?$",
+      "dest": "/frontend/extend.html"
+    },
+    {
+      "src": "/$",
+      "dest": "/frontend/index.html"
+    }
   ]
 }
