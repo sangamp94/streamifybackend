@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Streamify Admin Setup</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin:0; min-height:100vh; display:grid; place-items:center; padding:20px; background:#10141c; color:#eceff4; font:15px system-ui,sans-serif; }
+  main { width:100%; max-width:440px; background:#171d28; border:1px solid #2a3240; border-radius:14px; padding:26px; }
+  h1 { margin:0 0 8px; font-size:21px; }
+  p { color:#9aa5b8; font-size:13px; line-height:1.55; }
+  label { display:block; margin:16px 0 6px; color:#cbd3df; font-size:13px; }
+  input,select { width:100%; padding:12px; border-radius:8px; border:1px solid #354052; background:#10141c; color:#eceff4; font:inherit; }
+  button { width:100%; margin-top:20px; padding:12px; border:0; border-radius:8px; background:#c9a24b; color:#14100a; font-weight:700; cursor:pointer; }
+  button:disabled { opacity:.6; cursor:wait; }
+  .message { margin-top:16px; white-space:pre-wrap; line-height:1.5; font-size:13px; }
+  .error { color:#ff938b; } .success { color:#77d4ac; }
+  a { color:#c9a24b; }
+  .warning { padding:10px 12px; border-radius:8px; background:#242331; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Admin setup / password recovery</h1>
+  <p class="warning">This page requires the secret stored in Vercel as <code>ADMIN_SETUP_SECRET</code>. Never share that secret.</p>
+  <form id="form">
+    <label for="action">Action</label>
+    <select id="action" name="action">
+      <option value="create">Create first admin account</option>
+      <option value="reset">Reset an existing admin password</option>
+    </select>
+    <label for="secret">Setup secret</label>
+    <input id="secret" name="setup_secret" type="password" required autocomplete="off">
+    <label for="username">Admin username</label>
+    <input id="username" name="username" required minlength="3" maxlength="50" autocomplete="username">
+    <label for="password">New password (at least 12 characters)</label>
+    <input id="password" name="password" type="password" required minlength="12" autocomplete="new-password">
+    <button id="submit" type="submit">Continue</button>
+  </form>
+  <div id="message" class="message" role="status"></div>
+  <p><a href="/">Back to admin login</a></p>
+</main>
+<script>
+const form = document.getElementById('form');
+const button = document.getElementById('submit');
+const message = document.getElementById('message');
+form.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  message.textContent = '';
+  message.className = 'message';
+  button.disabled = true;
+  button.textContent = 'Working…';
+  const body = Object.fromEntries(new FormData(form).entries());
+  try {
+    const response = await fetch('/backend/setup.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || ('Request failed (' + response.status + '). Check the deployment and database setup.'));
+    message.textContent = data.message || 'Complete.';
+    message.className = 'message success';
+    form.reset();
+  } catch (error) {
+    message.textContent = error.message || 'Request failed.';
+    message.className = 'message error';
+  } finally {
+    button.disabled = false;
+    button.textContent = 'Continue';
+  }
+});
+</script>
+</body>
+</html>
